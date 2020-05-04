@@ -1,0 +1,153 @@
+## Count data DE analysis
+
+[1]. Reading the data.
+
+The merged the count data table will be read from a web URL to be able 
+to run this rmarkdown anywhere. 
+In Eukaryotes only a subset of all genes are expressed in 
+a given cell. Expression is therefore a bimodal distribution, 
+with non-expressed genes having counts that result from experimental 
+and biological noise. It is important to filter out the genes 
+that are not expressed before doing differential gene expression. 
+You can decide which cutoff separates expressed vs non-expressed 
+genes by looking your histogram we created.
+
+This is an rmd file I brought over from Dolphin Next Report to use to
+set up my Windows system to be able to show rmarkdown (rmd) files in rstudio,
+It only had one sample, so I also then added 3 more cols of data just to give
+it something to work with.  It is now working (after doing the stuff just below).
+
+Double clicking on a file with rmd extension will pop p rstudio to run
+the rmd file.  I also have fooled around with createing jupyter notebooks
+which can run R as well as Python.  See my *.ipynb notebook files for that.
+From console (type: cmd in start search box) type: jupyter notebook 
+to start the notebooks.
+
+# Rtools is needed to install packages (like BiocManager) on Windows
+# https://cran.rstudio.com/bin/windows/Rtools/  for R 4.0  I am running 3.6.3
+# https://cran.r-project.org/bin/windows/Rtools/history.html 
+#    After running the Rtools   installer
+https://cran.r-project.org/bin/windows/Rtools/installer.html
+# , follow the instructions in Rtools.txt #  https://cran.r-project.org/bin/windows/Rtools/Rtools.txt
+#    to complete your installation 
+https://cran.r-project.org/bin/windows/Rtools/index.html
+# Sys.which("make")  - finds it! So I don't need to manually edit my path.
+# to change my path I can search on "env" in the Start Search box, then edit
+# system environment variables.
+
+# see work/README.txt for install of StrawberryPerl and Rtools
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")  
+#        Installing package into ‘C:/Users/user/Documents/R/win-library/3.6’
+# BiocManager::install("debrowser") # LOTS of libraries installed. and GO and Org # databases.
+
+
+```{r, echo=FALSE, message=FALSE}
+
+library(debrowser)
+library(plotly)
+source("https://dolphinnext.umassmed.edu/dist/scripts/funcs.R")
+library(RCurl)
+url<-"https://dolphinnext.umassmed.edu/tmp/pub/Bw4R7pDxv4h9rKB7YFOHD5Ta9h9n2V/pubweb/rsem_summary/genes_expression_expected_count.tsv"
+file <- textConnection(getURL(url)) 
+rsem <- read.table(file,sep="\t", header=TRUE, row.names=1) # cols: transcript and KO1.            # rownames are genes
+data <- data.frame(rsem[,sapply(rsem, is.numeric)]) # renames the cols??
+colnames(data) = "col1"
+data$col2 = data$col1 + rnorm(nrow(data),sd=median(data$col1)/20)
+data$col3 = data$col1 + rnorm(nrow(data),mean=median(data$col1),sd=median(data$col1)/20)
+data$col4 = data$col1 + rnorm(nrow(data),mean=median(data$col1),sd=median(data$col1)/20)
+cols<- c("col1","col2","col3","col4")
+cols <- colnames(data)
+summary(data$col1)
+
+data <- data[, cols]
+data[data < 0] = 0
+
+h <- hist(log10(rowSums(data)), breaks = as.numeric(100), plot = FALSE) 
+
+plot_ly(x = h$mids, y = h$counts, width = 500, height=300) %>% 
+layout( title = "Histogram") %>%
+add_bars()
+``` 
+
+[2]. All2all scatter plots
+
+To check the reproducibility of biological replicates, we use all2all plots.
+
+```{r, echo=FALSE, message=FALSE}
+all2all(data)
+``` 
+
+[3]. DESeq ANALYSIS
+
+The goal of Differential gene expression analysis is to find 
+genes or transcripts whose difference in expression, when accounting 
+for the variance within condition, is higher than expected by chance. 
+
+The first step is to indicate the condition that each column (experiment) 
+in the table represent. 
+Here we define the correspondence between columns and conditions. 
+Make sure the order of the columns matches to your table.
+
+In this case a total sum of 10 counts separates well expressed 
+from non-expressed genes. You can change this value and padj value and 
+log2FoldChange cutoffs according to your data
+
+```{r, echo=FALSE, message=FALSE}
+conds <- factor( c("cond1","cond1","cond2","cond2") )
+avgall<-cbind(rowSums(data[cols[conds == levels(conds)[1]]])/3, 
+              rowSums(data[cols[conds == levels(conds)[2]]])/3)
+colnames(avgall)<-c(levels(conds)[1], levels(conds)[2])
+
+gdat<-data.frame(avgall)
+de_res <- runDESeq(data, cols, conds,  padj=0.01, log2FoldChange=1, non_expressed_cutoff=10)
+overlaid_data <- overlaySig(gdat, de_res$res_selected)
+ggplot() +
+  geom_point(data=overlaid_data, aes_string(x=levels(conds)[1], y=levels(conds)[2],
+                                            colour="Legend"), alpha=6/10, size=3) +
+  scale_colour_manual(values=c("All"="darkgrey","Significant"="red"))+
+  scale_x_log10() +scale_y_log10()
+```
+
+[4]. MA Plot
+
+The Second way to visualize it, we use MA plots.
+For MA Plot there is another builtin function that you can use
+
+```{r, echo=FALSE, message=FALSE}
+plotMA(de_res$res_detected,ylim=c(-2,2),main="DESeq2");
+```
+
+[5]. Volcano Plot
+
+The third way of visualizing the data is making a Volcano Plot.
+Here on the x axis you have log2foldChange values and y axis you 
+have your -log10 padj values. To see how significant genes are 
+distributed. Highlight genes that have an absolute fold change > 2 
+and a padj < 0.01
+
+```{r, echo=FALSE, message=FALSE}
+volcanoPlot(de_res,  padj=0.01, log2FoldChange=1)
+```
+
+[6] Heatmap
+
+The forth way of visualizing the data that is widely used in this 
+type of analysis is clustering and Heatmaps.
+
+```{r, echo=FALSE, message=FALSE}
+sel_data<-data[rownames(de_res$res_selected),]
+norm_data<-getNormalizedMatrix(sel_data, method="TMM")
+ld <- log2(norm_data+0.1)
+cldt <- scale(t(ld), center=TRUE, scale=TRUE);
+cld <- t(cldt)
+dissimilarity <- 1 - cor(cld)
+distance <- as.dist(dissimilarity)
+heatmap.2(cld, Rowv=TRUE,dendrogram="column",
+          Colv=TRUE, col=redblue(256),labRow=NA,
+          density.info="none",trace="none", cexCol=0.8,
+          hclust=function(x) hclust(x,method="complete"),
+          distfun=function(x) as.dist((1-cor(t(x)))/2))
+
+```
