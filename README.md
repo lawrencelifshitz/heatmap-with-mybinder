@@ -6,4 +6,10 @@ Bioconductor that may complicate things since mybinder can use MRAN to use a sna
 many R libraries, but that does not include those in Bioconductor I think.
 
 https://mybinder.readthedocs.io/en/latest/sample_repos.html  can be used with rstudio and rstudio
-runs rmarkdown. So try to base my stuff on the example given here for rstudio ...
+runs rmarkdown. So try to base my stuff on the example given here for rstudio ... they also have
+an example with ipywidgets ... and other interactive methods.
+
+https://github.com/sneumann/bioc_notebooks
+  Provide Binder'ised jupyter notebooks from Bioconductor Vognettes
+https://www.biorxiv.org/content/10.1101/144816v1.full.pdf
+
