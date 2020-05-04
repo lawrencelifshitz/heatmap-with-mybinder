@@ -12,4 +12,4 @@ an example with ipywidgets ... and other interactive methods.
 https://github.com/sneumann/bioc_notebooks
   Provide Binder'ised jupyter notebooks from Bioconductor Vognettes
 https://www.biorxiv.org/content/10.1101/144816v1.full.pdf
-
+   BiocImageBuilder used to generate 3 sample interactive mybinder projects for Bioconductor workflows.
